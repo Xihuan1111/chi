@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吃饭选择器</title></title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4F46E5',
+                        secondary: '#EC4899',
+                        accent: '#10B981',
+                        dark: '#1F2937',
+                        light: '#F3F4F6'
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .card-shadow {
+                box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.1), 0 8px 10px -6px rgba(79, 70, 229, 0.1);
+            }
+            .card-shadow-hover {
+                box-shadow: 0 20px 25px -5px rgba(79, 70, 229, 0.2), 0 10px 10px -5px rgba(79, 70, 229, 0.1);
+            }
+            .selected-glow {
+                box-shadow: 0 0 15px rgba(79, 70, 229, 0.6), 0 0 30px rgba(79, 70, 229, 0.4);
+            }
+        }
+    </style>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* 基础动画 */
+        .card-flip {
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        
+        .card-flip:hover {
+            transform: translateY(-5px) scale(1.02);
+        }
+        
+        /* 随机选择动画 */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 0.2s ease-in-out infinite;
+        }
+        
+        /* 选中动画 */
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        
+        .bounce-animation {
+            animation: bounce 0.5s ease-out 3;
+        }
+        
+        /* 入场动画 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        
+        /* 渐变背景 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+        }
+    </style>
+</head>
+<body class="font-inter bg-gradient-to-br from-light to-indigo-50 min-h-screen">
+    <!-- 顶部导航 -->
+    <header class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-indigo-100 shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-random text-primary text-2xl"></i>
+                <h1 class="text-xl font-bold text-dark">随机饭菜选择器(测试)</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="refreshBtn" class="p-2 rounded-full hover:bg-indigo-100 transition-colors">
+                    <i class="fa fa-refresh text-indigo-500"></i>
+                </button>
+                <button id="settingsBtn" class="p-2 rounded-full hover:bg-indigo-100 transition-colors">
+                    <i class="fa fa-cog text-indigo-500"></i>
+                </button>
+                <button id="historyBtn" class="p-2 rounded-full hover:bg-indigo-100 transition-colors">
+                    <i class="fa fa-history text-indigo-500"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- 标题区域 -->
+        <section class="text-center mb-12">
+            <h2 class="text-[clamp(1.8rem,5vw,3rem)] font-bold text-dark mb-3">
+                开始选择吧,迷茫的孩子!
+            </h2>
+            <p id="descriptionText" class="text-gray-600 max-w-2xl mx-auto">
+                心中有答，择即是迷；迷而未觉，则择无终期。
+            </p>
+        </section>
+        
+        <!-- 点名区域 -->
+        <section class="mb-12">
+            <div class="flex flex-col items-center">
+                <!-- 点名按钮 -->
+                <button id="pickBtn" class="relative bg-gradient-to-r from-primary to-indigo-600 text-white font-bold py-4 px-8 rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary/30 flex items-center">
+                    <span class="mr-2">开始选择吧</span>
+                    <i class="fa fa-refresh"></i>
+                    <div id="loadingSpinner" class="hidden absolute right-8 top-1/2 -translate-y-1/2 spinner">
+                        <i class="fa fa-circle-o-notch"></i>
+                    </div>
+                </button>
+                
+                <!-- 点名结果 -->
+                <div id="resultContainer" class="mt-8 w-full max-w-3xl">
+                    <div id="resultCard" class="bg-white rounded-2xl shadow-xl p-6 hidden">
+                        <div class="flex flex-col items-center">
+                            <div class="w-20 h-20 rounded-full bg-indigo-100 flex items-center justify-center mb-4">
+                                <i class="fa fa-star text-3xl text-primary"></i>
+                            </div>
+                            <h3 id="resultTitle" class="text-2xl font-bold text-dark mb-2">那么好,我们接下来</h3>
+                            <div id="resultNumber" class="text-5xl font-bold text-primary mb-6">吃饭!</div>
+                            <button id="newPickBtn" class="bg-primary text-white font-medium py-2 px-6 rounded-lg hover:bg-primary/90 transition-colors">
+                                不符合胃口?再选一次?
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+        
+        <!-- 数字列表 -->
+        <section id="numbersSection" class="mb-12">
+            <h3 class="text-xl font-bold text-dark mb-6 flex items-center">
+                <i class="fa fa-list-ol text-primary mr-2"></i>
+                可选盲盒数字
+            </h3>
+            
+            <div id="numbersContainer" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+                <!-- 数字卡片将通过JavaScript动态生成 -->
+            </div>
+        </section>
+        
+        <!-- 历史记录 -->
+        <section id="historySection" class="mb-12 hidden">
+            <h3 class="text-xl font-bold text-dark mb-6 flex items-center">
+                <i class="fa fa-history text-primary mr-2"></i>
+                选择历史
+            </h3>
+            
+            <div id="historyList" class="space-y-4">
+                <!-- 历史记录将通过JavaScript动态生成 -->
+            </div>
+        </section>
+    </main>
+    
+    <!-- 页脚 -->
+    <footer class="bg-white border-t border-indigo-100 py-6">
+        <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+            <p>© 人总在明知答案的迷宫里，重复叩问同一扇门。</p>
+        </div>
+    </footer>
+    
+    <!-- 设置模态框 -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-xl font-bold text-dark">选择设置</h3>
+                <button id="closeSettingsBtn" class="text-gray-400 hover:text-gray-600">
+                    <i class="fa fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">选择速度</label>
+                    <select id="animationSpeed" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary/50 focus:border-primary">
+                        <option value="fast">快速</option>
+                        <option value="normal" selected>正常</option>
+                        <option value="slow">慢速</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">显示历史记录</label>
+                    <div class="flex items-center">
+                        <input id="showHistory" type="checkbox" checked 
+                               class="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary">
+                        <label for="showHistory" class="ml-2 text-sm text-gray-700">
+                            记录每次选择结果
+                        </label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="mt-6 flex justify-end">
+                <button id="saveSettingsBtn" class="bg-primary text-white font-medium py-2 px-6 rounded-lg hover:bg-primary/90 transition-colors">
+                    保存设置
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // DOM 元素
+        const pickBtn = document.getElementById('pickBtn');
+        const refreshBtn = document.getElementById('refreshBtn');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const resultCard = document.getElementById('resultCard');
+        const resultNumber = document.getElementById('resultNumber');
+        const newPickBtn = document.getElementById('newPickBtn');
+        const numbersContainer = document.getElementById('numbersContainer');
+        const numbersSection = document.getElementById('numbersSection');
+        const descriptionText = document.getElementById('descriptionText');
+        const historyBtn = document.getElementById('historyBtn');
+        const historySection = document.getElementById('historySection');
+        const historyList = document.getElementById('historyList');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const animationSpeed = document.getElementById('animationSpeed');
+        const showHistory = document.getElementById('showHistory');
+        
+        // 可选数字
+        const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+        
+        // 饭菜对应表
+        const eat = [
+            { id: 1, name: "吃烤肉拌饭!", icon: "fa-gamepad" },
+            { id: 2, name: "吃粉丝汤!", icon: "fa-shield" },
+            { id: 3, name: "吃罩饼!", icon: "fa-car" },
+            { id: 4, name: "吃汉堡!", icon: "fa-bomb" },
+            { id: 5, name: "吃焖面!", icon: "fa-trophy" },
+            { id: 6, name: "吃面包!", icon: "fa-diamond" },
+            { id: 7, name: "喝蜜雪冰城!", icon: "fa-heart" },
+            { id: 8, name: "喝益禾堂!", icon: "fa-coffee" },
+            { id: 9, name: "吃蛋糕!", icon: "fa-cutlery" },
+            { id: 10, name: "吃面条!", icon: "fa-apple" },
+            { id: 11, name: "吃麻辣烫!", icon: "fa-fire" },
+            { id: 12, name: "吃凉菜!", icon: "fa-leaf" },
+            { id: 13, name: "去好想来!", icon: "fa-star" },
+            { id: 14, name: "吃米线!", icon: "fa-birthday-cake" },
+            { id: 15, name: "吃快餐!", icon: "fa-bolt" },
+            { id: 16, name: "去美团看看?", icon: "fa-gift" },
+            { id: 17, name: "去饿了么看看?", icon: "fa-sun-o" },
+            { id: 18, name: "吃烧烤!", icon: "fa-moon-o" },
+            { id: 19, name: "吃烤肉!", icon: "fa-cutlery" },
+            { id: 20, name: "吃黄焖鸡米饭!", icon: "fa-glass" }
+        ];
+        
+        // 历史记录
+        let history = JSON.parse(localStorage.getItem('randomNameHistory')) || [];
+        
+        // 设置
+        let settings = {
+            animationSpeed: 'normal',
+            showHistory: true
+        };
+        
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', () => {
+            // 加载设置
+            const savedSettings = JSON.parse(localStorage.getItem('randomNameSettings'));
+            if (savedSettings) {
+                settings = savedSettings;
+                animationSpeed.value = settings.animationSpeed;
+                showHistory.checked = settings.showHistory;
+            }
+            
+            // 渲染数字卡片
+            renderNumbers();
+            
+            // 渲染历史记录
+            renderHistory();
+            
+            // 事件监听
+            pickBtn.addEventListener('click', startRandomPick);
+            newPickBtn.addEventListener('click', resetGame);
+            refreshBtn.addEventListener('click', resetGame);
+            
+            historyBtn.addEventListener('click', () => {
+                historySection.classList.toggle('hidden');
+            });
+            
+            settingsBtn.addEventListener('click', () => {
+                settingsModal.classList.remove('hidden');
+            });
+            
+            closeSettingsBtn.addEventListener('click', () => {
+                settingsModal.classList.add('hidden');
+            });
+            
+            saveSettingsBtn.addEventListener('click', () => {
+                settings.animationSpeed = animationSpeed.value;
+                settings.showHistory = showHistory.checked;
+                localStorage.setItem('randomNameSettings', JSON.stringify(settings));
+                settingsModal.classList.add('hidden');
+            });
+        });
+        
+        // 渲染数字卡片
+        function renderNumbers() {
+            numbersContainer.innerHTML = '';
+            
+            numbers.forEach(number => {
+                const card = document.createElement('div');
+                card.className = 'number-card card-flip bg-white rounded-xl shadow-lg p-6 flex items-center justify-center text-3xl font-bold text-dark cursor-pointer hover:bg-indigo-50 transition-all duration-300';
+                card.dataset.number = number;
+                card.innerHTML = number;
+                
+                numbersContainer.appendChild(card);
+            });
+        }
+        
+        // 渲染历史记录
+        function renderHistory() {
+            historyList.innerHTML = '';
+            
+            if (history.length === 0) {
+                const emptyItem = document.createElement('div');
+                emptyItem.className = 'text-center text-gray-500 py-4';
+                emptyItem.innerHTML = '暂无选择记录';
+                historyList.appendChild(emptyItem);
+                return;
+            }
+            
+            history.forEach((item, index) => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'bg-white rounded-lg shadow p-4 flex justify-between items-center';
+                historyItem.innerHTML = `
+                    <div class="flex items-center">
+                        <span class="text-gray-500 mr-3">#${history.length - index}</span>
+                        <span class="text-lg font-semibold">${item.name}</span>
+                    </div>
+                    <div class="text-sm text-gray-500">${formatDate(item.date)}</div>
+                `;
+                historyList.appendChild(historyItem);
+            });
+        }
+        
+        // 格式化日期
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`;
+        }
+        
+        // 开始随机选择
+        function startRandomPick() {
+            // 禁用按钮
+            pickBtn.disabled = true;
+            loadingSpinner.classList.remove('hidden');
+            
+            // 获取所有数字卡片
+            const numberCards = Array.from(numbersContainer.querySelectorAll('.number-card'));
+            
+            // 随机选择次数和速度
+            let speed = 100;
+            switch(settings.animationSpeed) {
+                case 'fast':
+                    speed = 80;
+                    break;
+                case 'normal':  
+                    speed = 100;
+                    break;
+                case 'slow':
+                    speed = 150;
+                    break;
+            }
+            
+            const iterations = 15 + Math.floor(Math.random() * 10);
+            let currentIteration = 0;
+            let previousIndex = -1;
+            
+            // 动画循环
+            const animationInterval = setInterval(() => {
+                // 清除之前的高亮
+                if (previousIndex !== -1) {
+                    numberCards[previousIndex].classList.remove('bg-primary', 'text-white', 'pulse-animation');
+                    numberCards[previousIndex].classList.add('bg-white', 'text-dark');
+                }
+                
+                // 随机选择一个新的索引
+                let randomIndex;
+                do {
+                    randomIndex = Math.floor(Math.random() * numberCards.length);
+                } while (randomIndex === previousIndex && numberCards.length > 1);
+                
+                previousIndex = randomIndex;
+                
+                // 高亮当前选择
+                numberCards[randomIndex].classList.remove('bg-white', 'text-dark');
+                numberCards[randomIndex].classList.add('bg-primary', 'text-white', 'pulse-animation');
+                
+                currentIteration++;
+                
+                // 动画结束
+                if (currentIteration >= iterations) {
+                    clearInterval(animationInterval);
+                    
+                    // 获取选中的数字
+                    const selectedNumber = parseInt(numberCards[randomIndex].dataset.number);
+                    
+                    // 查找对应的游戏
+                    const game = eat.find(g => g.id === selectedNumber);
+                    
+                    if (game) {
+                        // 显示游戏名称
+                        resultNumber.textContent = game.name;
+                        
+                        // 显示结果卡片
+                        resultCard.classList.remove('hidden');
+                        
+                        // 隐藏数字区域和描述文本
+                        numbersSection.classList.add('hidden');
+                        descriptionText.classList.add('hidden');
+                        pickBtn.classList.add('hidden');
+                        
+                        // 添加选中动画
+                        numberCards[randomIndex].classList.remove('pulse-animation');
+                        numberCards[randomIndex].classList.add('bounce-animation', 'selected-glow');
+                        
+                        // 记录到历史
+                        if (settings.showHistory) {
+                            history.unshift({
+                                name: game.name,
+                                date: new Date().toISOString()
+                            });
+                            
+                            // 只保留最近的20条记录
+                            if (history.length > 20) {
+                                history = history.slice(0, 20);
+                            }
+                            
+                            localStorage.setItem('randomNameHistory', JSON.stringify(history));
+                            renderHistory();
+                        }
+                    }
+                    
+                    // 重新启用按钮
+                    pickBtn.disabled = false;
+                    loadingSpinner.classList.add('hidden');
+                }
+            }, speed);
+        }
+        
+        // 重置游戏
+        function resetGame() {
+            // 隐藏结果卡片
+            resultCard.classList.add('hidden');
+            
+            // 显示数字区域和描述文本
+            numbersSection.classList.remove('hidden');
+            descriptionText.classList.remove('hidden');
+            pickBtn.classList.remove('hidden');
+            
+            // 重置数字卡片样式
+            numbersContainer.querySelectorAll('.number-card').forEach(card => {
+                card.classList.remove('bg-primary', 'text-white', 'selected-glow', 'bounce-animation');
+                card.classList.add('bg-white', 'text-dark');
+            });
+        }
+    </script>
+</body>
+</html>
